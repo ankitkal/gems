@@ -8,6 +8,7 @@ from django.db.models import Q
 
 from models import Users, Candidates,Votes, PublicKeys, ChallengeStrings, Posts, GlobalVariables
 import cryptography
+import excelfunc
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +27,14 @@ def registerUsers(userList):
 	passwords = [cryptography.generatePrintableRandomString() for i in range(noUsers)]
 
 	publicKeys = []
+	username = []
 	for i in range(noUsers):
 		challengeStr = cryptography.generateRandomString(128)
 		newChallengeStr = ChallengeStrings(challengeStr=challengeStr)
 		newChallengeStr.save()
 
 		newPublicKey = addUser(userList[i]['username'], userList[i]['department'], userList[i]['name'], userList[i]['course'], userList[i]['gender'], userList[i]['hostel'], passwords[i])
-
+		username += [userList[i]['username']]
 		publicKeys += [newPublicKey]
 		user = User.objects.create_user(username = userList[i]['username'], password = passwords[i])
 		user.save()
@@ -42,7 +44,7 @@ def registerUsers(userList):
 	for i in range(len(publicKeys)):
 		newPublicKey = PublicKeys(publicKey=publicKeys[i])
 		newPublicKey.save()
-
+	excelfunc.passwordtoexcel(passwords=passwords,usernames=username)
 	return passwords
 
 def addUser(username, department, name, course, gender, hostel, password, voted=False):
@@ -119,14 +121,26 @@ def getVotablePosts(voterGender,voterCourse):
 	return postsDictList
 
 #--------------------
-def verifyVote(votes):
+def verifyVote():
 	"""Verifies all votes"""
+	votes = Votes.objects.all()
+	text = []
+	certi = []
+	publickey = []
+	verified = []
+	result = True
 	for vote in votes:
 		value = cryptography.asymmetricVerify(vote.plainText, vote.certificate, vote.publicKey.publicKey)
+		text += [vote.plainText]
+		certi += [vote.certificate]
+		publickey += [vote.publicKey.publicKey]
+		verified += [result]
 		if value == False:
 			print error
-			return value
-	return value
+			result = False
+
+	excelfunc.votestoexcel(text,certi,publickey,verified,result)
+	return result
 
 #---------------------
 def getStats():
